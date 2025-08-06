@@ -2,7 +2,7 @@ scalaVersion := "3.7.1"
 
 lazy val root = (project in file("."))
   .settings(
-    name         := "linked-source",
+    name         := "JobsReeler",
     organization := "com.keivanabdi",
     version      := "0.1.0-SNAPSHOT"
   )
