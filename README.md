@@ -22,7 +22,7 @@ The purpose of this example is to demonstrate how to build a "human-in-the-loop"
 This project is built with sbt. To run the application, you will need to have sbt installed.
 
 1.  **Configure Cookies**: You will need to provide your LinkedIn cookies in a JSON file. The file should contain a JSON array where each object has `name`, `value`, and `domain` keys. You can use a browser extension like [Get cookies.txt LOCALLY](https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc) for Chrome to export your cookies from your LinkedIn account.
-2.  **Configure Secrets**: Create a configuration file named `secret.conf` in the `src/main/resources` directory. You can use `src/main/resources/secret.template.conf` as a template to see the required structure and fill in your details. 
+2.  **Configure Secrets**: Create a configuration file named `secret.conf` in the `src/main/resources` directory. You can use [`secret.template.conf`](src/main/resources/secret.template.conf) as a template to see the required structure and fill in your details. 
 3.  **Run the Application**:
     ```bash
     sbt run
