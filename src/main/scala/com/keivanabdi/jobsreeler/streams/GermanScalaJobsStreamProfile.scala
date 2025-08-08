@@ -36,7 +36,7 @@ object GermanScalaJobsStreamProfile extends StreamProfile {
   private val logger = LoggerFactory.getLogger(getClass.getName)
 
   override val initialUrl: String =
-    "https://www.linkedin.com/jobs/search/?keywords=scala&geoId=101282230&sortBy=DD&origin=JOB_SEARCH_PAGE_SEARCH_BUTTON"
+    "https://www.linkedin.com/jobs/search/?keywords=scala&geoId=101282230&sortBy=DD&f_WT=1%2C3&origin=JOB_SEARCH_PAGE_SEARCH_BUTTON"
 
   private val blackListWords: Set[String] =
     Set("golang", "rust", "nextjs", "android")
