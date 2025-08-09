@@ -6,7 +6,7 @@ This is a sample project that demonstrates the capabilities of the [DataReeler](
 
 This project provides a concrete example of a `DataReeler` application. It is configured to:
 
-1.  Scrape Scala job postings in Germany from LinkedIn.
+1.  Scrape Scala job postings in Germany/Austria from LinkedIn.
 2.  Enrich and filter the raw job data through a multi-stage pipeline. This includes:
     *   Using an AI model via Ollama to determine the language of the job posting (e.g., German or English).
     *   Using an AI model via Gemini to analyze the job description and determine the required German language proficiency level.

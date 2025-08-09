@@ -32,11 +32,14 @@ import com.keivanabdi.jobsreeler.utils.VisaSponsorshipHelper.*
 import org.joda.time.DateTime
 import org.slf4j.LoggerFactory
 
-object GermanScalaJobsStreamProfile extends StreamProfile {
+trait DACHScalaJobsStreamProfile extends StreamProfile {
   private val logger = LoggerFactory.getLogger(getClass.getName)
 
-  override val initialUrl: String =
-    "https://www.linkedin.com/jobs/search/?keywords=scala&geoId=101282230&sortBy=DD&f_WT=1%2C3&origin=JOB_SEARCH_PAGE_SEARCH_BUTTON"
+  val geoId      : String
+  val countryName: String
+
+  lazy val initialUrl: String =
+    s"https://www.linkedin.com/jobs/search/?keywords=scala&geoId=$geoId&sortBy=DD&f_WT=1%2C3&origin=JOB_SEARCH_PAGE_SEARCH_BUTTON"
 
   private val blackListWords: Set[String] =
     Set("golang", "rust", "nextjs", "android")
@@ -112,7 +115,7 @@ object GermanScalaJobsStreamProfile extends StreamProfile {
           }
         }
     Source.fromFutureSource {
-      findVisaSponsoringCompanyUsernames("germany").map:
+      findVisaSponsoringCompanyUsernames(countryName).map:
         case Left(error) =>
           Source.failed(
             new RuntimeException(

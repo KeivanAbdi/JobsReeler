@@ -19,7 +19,7 @@ import com.keivanabdi.jobsreeler.scrapers.LinkedInJobsScrapper
 import com.keivanabdi.jobsreeler.utils.Cache
 
 trait StreamProfile {
-  val initialUrl: String
+  def initialUrl: String
 
   def buildJobStream(
       linkedInScrapper: LinkedInJobsScrapper
