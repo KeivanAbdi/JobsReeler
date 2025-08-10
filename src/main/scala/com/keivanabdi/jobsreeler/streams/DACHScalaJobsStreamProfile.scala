@@ -41,20 +41,19 @@ trait DACHScalaJobsStreamProfile extends StreamProfile {
   lazy val initialUrl: String =
     s"https://www.linkedin.com/jobs/search/?keywords=scala&geoId=$geoId&sortBy=DD&f_WT=1%2C3&origin=JOB_SEARCH_PAGE_SEARCH_BUTTON"
 
-  private val blackListWords: Set[String] =
-    Set("golang", "rust", "nextjs", "android")
-  private val whitelistWords: Set[String] = Set("scala")
-
   def buildJobStream(
       linkedInScrapper: LinkedInJobsScrapper
   )(using
-      ActorSystem,
-      ExecutionContext,
-      Ordering[Log],
-      AppConfig,
-      WebSocketStreamBackend[Future, PekkoStreams],
-      Cache
+      actorSystem: ActorSystem,
+      ec         : ExecutionContext,
+      ordering   : Ordering[Log],
+      appConfig  : AppConfig,
+      wsBackend  : WebSocketStreamBackend[Future, PekkoStreams],
+      cache      : Cache
   ): Source[ReelElement[JobDetail, JobMetaData, Instructions], ?] = {
+    logger.debug(
+      s"Building a job String with this profile configs: ${appConfig.sourceProfile}"
+    )
     lazy val initialMappingFlow: Flow[
       JobSummary,
       ReelElement[JobSummary, JobMetaData, Instructions],
@@ -168,7 +167,7 @@ trait DACHScalaJobsStreamProfile extends StreamProfile {
               )
               .via(
                 filterBlacklistFlow(
-                  blackLists       = blackListWords,
+                  blacklistWords   = appConfig.sourceProfile.blacklistWords,
                   targetField      = _.title.pipe(Some(_)),
                   companyNameField = _.company,
                   jobLink          = _.link
@@ -200,7 +199,7 @@ trait DACHScalaJobsStreamProfile extends StreamProfile {
               )
               .via(
                 filterWhitelistFlow(
-                  whitelists       = whitelistWords,
+                  whitelistWords   = appConfig.sourceProfile.whitelistWords,
                   targetField      = _.descriptionText.pipe(Some(_)),
                   companyNameField = _.summary.company,
                   jobLink          = _.summary.link

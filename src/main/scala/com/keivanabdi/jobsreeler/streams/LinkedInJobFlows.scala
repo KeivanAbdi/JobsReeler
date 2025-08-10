@@ -138,7 +138,7 @@ object LinkedInJobFlows {
       }
 
   def filterBlacklistFlow[A](
-      blackLists      : Set[String],
+      blacklistWords  : Set[String],
       targetField     : A => Option[String],
       companyNameField: A => String,
       jobLink         : A => String
@@ -152,7 +152,7 @@ object LinkedInJobFlows {
         case reelElement @ ReelElement(Some(userData), userMetaData, _) =>
           targetField(userData) match {
             case Some(fieldValue) =>
-              blackLists.find(blk =>
+              blacklistWords.find(blk =>
                 fieldValue.toLowerCase.contains(blk)
               ) match {
                 case None => reelElement
@@ -185,7 +185,7 @@ object LinkedInJobFlows {
       }
 
   def filterWhitelistFlow[A](
-      whitelists      : Set[String],
+      whitelistWords  : Set[String],
       targetField     : A => Option[String],
       companyNameField: A => String,
       jobLink         : A => String
@@ -201,7 +201,7 @@ object LinkedInJobFlows {
             case Some(fieldValue) =>
               val fieldValueLower = fieldValue.toLowerCase
 
-              whitelists.find { whitelistedWord =>
+              whitelistWords.find { whitelistedWord =>
                 val pattern = s"\\b${Regex.quote(whitelistedWord)}\\b".r
                 pattern.findFirstIn(fieldValueLower).isDefined
               } match {
