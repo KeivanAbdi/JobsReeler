@@ -21,6 +21,7 @@ import com.keivanabdi.datareeler.templates.FullWidthInfiniteScroll.Instructions
 import com.keivanabdi.jobsreeler.ai.GermanLevelDetection.GermanLanguageLevel
 import com.keivanabdi.jobsreeler.models.config.AIConfig
 import com.keivanabdi.jobsreeler.models.config.AppConfig
+import com.keivanabdi.jobsreeler.models.config.DACHScalaJobsConfig
 import com.keivanabdi.jobsreeler.models.job.JobDetail
 import com.keivanabdi.jobsreeler.models.job.JobMetaData
 import com.keivanabdi.jobsreeler.models.job.JobSummary
@@ -122,7 +123,19 @@ trait DACHScalaJobsStreamProfile extends StreamProfile {
             )
           )
         case Right(visaSponsoringCompanyUsernames) =>
-          given AIConfig = summon[AppConfig].ai
+          given AIConfig = appConfig.ai
+
+          val dachSourceProfileConfig =
+            (appConfig.sourceProfile: @unchecked) match {
+              case dachScalaJobsConfig: DACHScalaJobsConfig =>
+                dachScalaJobsConfig
+              case other =>
+                val errorMsg =
+                  s"Incompatible source profile configuration: ${other.getClass.getName} for DACHScalaJobsStreamProfile. Expected a DACHScalaJobsConfig."
+                logger.error(errorMsg)
+                throw new IllegalArgumentException(errorMsg)
+            }
+
           val (logActor, logStream) =
             Source
               .actorRef[ReelElement[JobDetail, JobMetaData, Instructions]](
@@ -167,7 +180,7 @@ trait DACHScalaJobsStreamProfile extends StreamProfile {
               )
               .via(
                 filterBlacklistFlow(
-                  blacklistWords   = appConfig.sourceProfile.blacklistWords,
+                  blacklistWords   = dachSourceProfileConfig.blacklistWords,
                   targetField      = _.title.pipe(Some(_)),
                   companyNameField = _.company,
                   jobLink          = _.link
@@ -199,7 +212,7 @@ trait DACHScalaJobsStreamProfile extends StreamProfile {
               )
               .via(
                 filterWhitelistFlow(
-                  whitelistWords   = appConfig.sourceProfile.whitelistWords,
+                  whitelistWords   = dachSourceProfileConfig.whitelistWords,
                   targetField      = _.descriptionText.pipe(Some(_)),
                   companyNameField = _.summary.company,
                   jobLink          = _.summary.link
