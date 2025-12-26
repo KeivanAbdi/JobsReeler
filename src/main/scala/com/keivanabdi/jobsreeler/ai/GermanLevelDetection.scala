@@ -6,17 +6,17 @@ import com.keivanabdi.jobsreeler.ai.GermanLevelDetection.*
 import com.keivanabdi.jobsreeler.ai.clients.GeminiClient
 import com.keivanabdi.jobsreeler.models.config.AIConfig
 import io.circe.*
+import pureconfig.generic.derivation.EnumConfigReader
 
 object GermanLevelDetection extends GeminiClient[GermanLevelResponse] {
 
-  enum GermanLanguageLevel(val level: Int) {
+  enum GermanLanguageLevel(val level: Int) derives EnumConfigReader:
     case A1 extends GermanLanguageLevel(1)
     case A2 extends GermanLanguageLevel(2)
     case B1 extends GermanLanguageLevel(3)
     case B2 extends GermanLanguageLevel(4)
     case C1 extends GermanLanguageLevel(5)
     case C2 extends GermanLanguageLevel(6)
-  }
 
   final case class GermanLevelResponse(
       germanLevel: Option[GermanLanguageLevel]

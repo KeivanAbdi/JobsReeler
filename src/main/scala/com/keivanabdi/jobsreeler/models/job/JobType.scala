@@ -1,6 +1,8 @@
 package com.keivanabdi.jobsreeler.models.job
 
-enum JobType(val name: String):
+import pureconfig.generic.derivation.EnumConfigReader
+
+enum JobType(val name: String) derives EnumConfigReader:
   case Hybrid extends JobType("Hybrid")
   case OnSite extends JobType("On-site")
   case Remote extends JobType("Remote")

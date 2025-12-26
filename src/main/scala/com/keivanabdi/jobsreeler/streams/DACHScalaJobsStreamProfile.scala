@@ -18,14 +18,12 @@ import scala.util.chaining._
 import com.keivanabdi.datareeler.models.*
 import com.keivanabdi.datareeler.templates.FullWidthInfiniteScroll
 import com.keivanabdi.datareeler.templates.FullWidthInfiniteScroll.Instructions
-import com.keivanabdi.jobsreeler.ai.GermanLevelDetection.GermanLanguageLevel
 import com.keivanabdi.jobsreeler.models.config.AIConfig
 import com.keivanabdi.jobsreeler.models.config.AppConfig
 import com.keivanabdi.jobsreeler.models.config.DACHScalaJobsConfig
 import com.keivanabdi.jobsreeler.models.job.JobDetail
 import com.keivanabdi.jobsreeler.models.job.JobMetaData
 import com.keivanabdi.jobsreeler.models.job.JobSummary
-import com.keivanabdi.jobsreeler.models.job.JobType
 import com.keivanabdi.jobsreeler.models.job.Log
 import com.keivanabdi.jobsreeler.scrapers.LinkedInJobsScrapper
 import com.keivanabdi.jobsreeler.utils.Cache
@@ -125,7 +123,7 @@ trait DACHScalaJobsStreamProfile extends StreamProfile {
         case Right(visaSponsoringCompanyUsernames) =>
           given AIConfig = appConfig.ai
 
-          val dachSourceProfileConfig =
+          val dachSourceProfileConfig: DACHScalaJobsConfig =
             (appConfig.sourceProfile: @unchecked) match {
               case dachScalaJobsConfig: DACHScalaJobsConfig =>
                 dachScalaJobsConfig
@@ -145,7 +143,11 @@ trait DACHScalaJobsStreamProfile extends StreamProfile {
                 overflowStrategy  = OverflowStrategy.dropHead
               )
               .preMaterialize()
-          val originalStream =
+
+          val originalStream: Source[
+            ReelElement[JobDetail, JobMetaData, Instructions],
+            NotUsed
+          ] =
             Source
               .single {
                 ReelElement(
@@ -174,8 +176,7 @@ trait DACHScalaJobsStreamProfile extends StreamProfile {
               )
               .via(
                 filterJobType(
-                  JobType.Hybrid,
-                  JobType.OnSite
+                  dachSourceProfileConfig.jobTypes
                 )
               )
               .via(
@@ -221,12 +222,13 @@ trait DACHScalaJobsStreamProfile extends StreamProfile {
               .via(
                 filterGermanLanguageLevel(
                   targetField      = _.descriptionText.pipe(Some(_)),
-                  maxGermanLevel   = GermanLanguageLevel.A2,
+                  maxGermanLevel   = dachSourceProfileConfig.germanLanguageLevel,
                   companyNameField = _.summary.company,
                   jobLink          = _.summary.link
                 )
               )
 
+          // Merging and transforming logStream and originalStream into one final stream
           originalStream
             .merge(logStream)
             .recoverWith[ReelElement[JobDetail, JobMetaData, Instructions]] {

@@ -17,6 +17,19 @@ This project provides a concrete example of a `DataReeler` application. It is co
 
 The purpose of this example is to demonstrate how to build a "human-in-the-loop" application, where a user can interactively explore and refine a large stream of data.
 
+
+## Prerequisites
+
+Before running the application, ensure you have the following set up:
+
+1.  **Ollama**: This project uses [Ollama](https://ollama.com/) for local AI processing.
+    *   Make sure Ollama is installed and running.
+    *   Pull the required model (used for language detection):
+        ```bash
+        ollama pull qwen3:0.6b
+        ```
+    *   (Optional) If you want to use a different model, you can configure it in `application.conf` or your profile config.
+
 ## How to Run
 
 This project is built with sbt. To run the application, you will need to have sbt installed.
@@ -25,9 +38,24 @@ This project is built with sbt. To run the application, you will need to have sb
 2.  **Configure Secrets**: Create a configuration file named `secret.conf` in the `src/main/resources` directory. You can use [`secret.template.conf`](src/main/resources/secret.template.conf) as a template to see the required structure and fill in your details. 
 3.  **Run the Application**:
     ```bash
-    sbt run
+    sbt "run --source-profile=profiles/germany-scala-jobs.conf"
     ```
-3.  **View the UI**: Open your web browser and navigate to `http://localhost:8080`.
+4.  **View the UI**: Open your web browser and navigate to `http://localhost:8080`.
+
+
+## Profiles
+
+The application configuration is powered by **PureConfig**. The `type` field in the configuration file selects the specific class that extends the `SourceProfileConfig` sealed trait. This class must provide a `profile` field of type `StreamProfile` to generate the stream.
+
+You can:
+
+1.  **Select an existing profile**:
+    Use one of the configuration files already provided in the `profiles/` directory (e.g., `profiles/germany-scala-jobs.conf`).
+
+2.  **Create your own profile**:
+    Create a new `.conf` file and:
+    - **Use an existing type**: Set `type` to an existing configuration class (e.g., `type = "germany-scala-jobs"`) and customize the values.
+    - **Define a new type**: Create a new `class` extending `SourceProfileConfig` with a `StreamProfile` field, then reference this new type in your config.
 
 ## Disclaimer
 

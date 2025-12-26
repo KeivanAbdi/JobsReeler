@@ -19,7 +19,7 @@ import scala.collection.immutable.SortedSet
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 import scala.concurrent.duration.*
-import scala.io.BufferedSource
+
 import scala.io.StdIn
 
 import com.keivanabdi.datareeler.models.*
@@ -36,137 +36,165 @@ import io.circe.generic.auto.*
 import io.circe.parser.*
 import org.joda.time.DateTime
 import org.slf4j.LoggerFactory
+import java.io.File
+import scala.util.Using
 
-object Main extends App {
+object Main {
   val logger = LoggerFactory.getLogger(getClass.getName)
 
-  ConfigSource.default.load[AppConfig] match
-    case Left(errors) =>
-      errors.toList.foreach(error => logger.error(error.description))
-    case Right(appConfig) =>
-      given AppConfig = appConfig
+  def main(args: Array[String]): Unit =
+    args.collectFirst {
+      case s"--source-profile=$filePath" if new File(filePath).exists() =>
+        Right(ConfigSource.file(filePath))
 
-      given actorSystem: ActorSystem = ActorSystem("linkedin-scrapper")
+      case s"--source-profile=$filePath" =>
+        Left(s"The source profile file at '$filePath' does not exist.")
 
-      given Ordering[Log] = Ordering.by(_.time)
-
-      given blockingEc: ExecutionContext =
-        actorSystem.dispatchers.lookup("blocking-io-dispatcher")
-
-      given wsClientBackendOptions
-          : WebSocketStreamBackend[Future, PekkoStreams] =
-        PekkoHttpBackend.usingActorSystem(
-          actorSystem = actorSystem,
-          options     = appConfig.httpProxy.asBackendOptions
+    } match
+      case None =>
+        logger.error(
+          "No source profile provided. Please use --source-profile=<file-path> to specify the source profile configuration."
         )
+      case Some(Left(error)) =>
+        logger.error(error)
 
-      given CacheConfig = appConfig.cache
-      given Cache       = Cache()
-      val cookieMapEither: Either[Error, Seq[CookieItem]] = {
-        val sourceBuffer: BufferedSource =
-          scala.io.Source.fromFile(appConfig.cookie.cookieFilePath)
+      case Some(Right(sourceProfileConfig)) =>
+        sourceProfileConfig
+          .withFallback(ConfigSource.default)
+          .load[AppConfig] match
+          case Left(errors) =>
+            errors.toList.foreach(error => logger.error(error.description))
+          case Right(appConfig) =>
+            runServer(appConfig)
 
-        val content: String =
-          sourceBuffer.mkString
+  def runServer(appConfig: AppConfig): Unit = {
+    given AppConfig = appConfig
 
-        sourceBuffer.close()
-        parse(content).flatMap(_.as[Seq[CookieItem]])
+    given actorSystem: ActorSystem = ActorSystem("linkedin-scrapper")
+
+    given Ordering[Log] = Ordering.by(_.time)
+
+    given blockingEc: ExecutionContext =
+      actorSystem.dispatchers.lookup("blocking-io-dispatcher")
+
+    given wsClientBackendOptions: WebSocketStreamBackend[Future, PekkoStreams] =
+      PekkoHttpBackend.usingActorSystem(
+        actorSystem = actorSystem,
+        options     = appConfig.httpProxy.asBackendOptions
+      )
+
+    given CacheConfig = appConfig.cache
+    given Cache       = Cache()
+    val cookieMapEither: Either[Error, Seq[CookieItem]] =
+      Using(
+        scala.io.Source.fromFile(appConfig.cookie.cookieFilePath)
+      ) { source =>
+        source.mkString
+      }.toEither match {
+        case Left(ex) =>
+          Left(
+            ParsingFailure(s"Failed to read cookie file: ${ex.getMessage}", ex)
+          )
+        case Right(content) =>
+          parse(content).flatMap(_.as[Seq[CookieItem]])
       }
 
-      cookieMapEither match
-        case Left(error) => logger.error(error.toString())
-        case Right(cookieItems) =>
-          val streamProfile: StreamProfile =
-            appConfig.sourceProfile.profile
+    cookieMapEither match
+      case Left(error) => logger.error(error.toString())
+      case Right(cookieItems) =>
+        val streamProfile: StreamProfile =
+          appConfig.sourceProfile.profile
 
-          val linkedInScrapper: LinkedInJobsScrapper =
-            new LinkedInJobsScrapper(
-              cookieItems = cookieItems,
-              initialUrl  = streamProfile.initialUrl,
-              proxyServer = Some(appConfig.httpProxy.toString())
-            )
+        val linkedInScrapper: LinkedInJobsScrapper =
+          new LinkedInJobsScrapper(
+            cookieItems = cookieItems,
+            initialUrl  = streamProfile.initialUrl,
+            proxyServer = Some(appConfig.httpProxy.toString())
+          )
+        def inputStream: Source[
+          ReelElement[JobDetail, JobMetaData, Instructions],
+          ?
+        ] =
+          streamProfile.buildJobStream(linkedInScrapper)
 
-          def inputStream
-              : Source[ReelElement[JobDetail, JobMetaData, Instructions], ?] =
-            streamProfile.buildJobStream(linkedInScrapper)
-
-          val reelerTemplate: FullWidthInfiniteScroll[JobDetail, JobMetaData] =
-            FullWidthInfiniteScroll(
-              dataHtmlRenderer = { _ =>
-                JobHtmlRenderers.createExpandableItemHtml.andThen(
-                  HtmlRenderable.ScalatagsHtml(_)
-                )
-              },
-              metaHtmlRenderer = {
-                (previousTemplateInstruction: Option[Instructions]) =>
-                  (metaData: JobMetaData) =>
-                    HtmlRenderable.ScalatagsHtml {
-                      JobHtmlRenderers.createMetaHtml(
-                        metaData = metaData,
-                        maybePreviousTemplateInstructions =
-                          previousTemplateInstruction
-                      )
-                    }
-              },
-              styleBlocks =
-                CssRenderable.CssFile("/static/web/job/index.css") :: Nil,
-              javascriptBlocks = JavascriptRenderable.JavascriptFile(
-                "/static/web/job/index.js"
-              ) :: Nil,
-              defaultButtonText = "Click to enqueue more data calls!",
-              previouslyRequestedItemsProcessedText =
-                "Click to enqueue more data calls! [Your previously requested items were processed]",
-              previouslyRequestedItemsNotProcessedText =
-                "Click to enqueue more data calls! [Your previously requested items are enqueued for processing]",
-              sendingSignalText              = "Sending fetching signals...",
-              sendingSignalAnimationDuration = 900,
-              updatingButtonTextDuration     = 300,
-              streamFinishedText             = "I'm done"
-            )
-
-          val reelerSystem: ReelerSystem[
-            JobDetail,
-            JobMetaData,
-            FullWidthInfiniteScroll.Instructions
-          ] = {
-            // Create the configuration object first
-            val reelerConfig = ReelerSystemConfig(
-              reelerTemplate = reelerTemplate,
-              initialMetaData = () =>
-                JobMetaData(
-                  incomingItemsCount = Some(0),
-                  lastUpdateTime     = DateTime.now(),
-                  logs               = SortedSet.empty
-                ),
-              demandBatchSize = 5,
-              timeout         = 30.seconds
-            )
-
-            // Instantiate ReelerSystem with the config object
-            ReelerSystem(
-              inputReelElementStream = () => inputStream,
-              config                 = reelerConfig,
-              userRoutes             = Nil
-            )
-          }
-
-          val bindingFuture = reelerSystem.start()
-
-          bindingFuture
-            .map { binding =>
-              logger.info(
-                s"Server online at http://localhost:8080/\nPress RETURN to stop..."
+        val reelerTemplate: FullWidthInfiniteScroll[JobDetail, JobMetaData] =
+          FullWidthInfiniteScroll(
+            dataHtmlRenderer = { _ =>
+              JobHtmlRenderers.createExpandableItemHtml.andThen(
+                HtmlRenderable.ScalatagsHtml(_)
               )
-              StdIn.readLine()
+            },
+            metaHtmlRenderer = {
+              (previousTemplateInstruction: Option[Instructions]) =>
+                (metaData: JobMetaData) =>
+                  HtmlRenderable.ScalatagsHtml {
+                    JobHtmlRenderers.createMetaHtml(
+                      metaData = metaData,
+                      maybePreviousTemplateInstructions =
+                        previousTemplateInstruction
+                    )
+                  }
+            },
+            styleBlocks =
+              CssRenderable.CssFile("/static/web/job/index.css") :: Nil,
+            javascriptBlocks = JavascriptRenderable.JavascriptFile(
+              "/static/web/job/index.js"
+            ) :: Nil,
+            defaultButtonText = "Click to enqueue more data calls!",
+            previouslyRequestedItemsProcessedText =
+              "Click to enqueue more data calls! [Your previously requested items were processed]",
+            previouslyRequestedItemsNotProcessedText =
+              "Click to enqueue more data calls! [Your previously requested items are enqueued for processing]",
+            sendingSignalText              = "Sending fetching signals...",
+            sendingSignalAnimationDuration = 900,
+            updatingButtonTextDuration     = 300,
+            streamFinishedText             = "I'm done"
+          )
 
-              logger.info("Stopping...")
+        val reelerSystem: ReelerSystem[
+          JobDetail,
+          JobMetaData,
+          FullWidthInfiniteScroll.Instructions
+        ] = {
+          // Create the configuration object first
+          val reelerConfig = ReelerSystemConfig(
+            reelerTemplate = reelerTemplate,
+            initialMetaData = () =>
+              JobMetaData(
+                incomingItemsCount = Some(0),
+                lastUpdateTime     = DateTime.now(),
+                logs               = SortedSet.empty
+              ),
+            demandBatchSize = 5,
+            timeout         = 30.seconds
+          )
 
-              binding
-                .unbind() // trigger unbinding from the port
-                .onComplete(_ =>
-                  actorSystem.terminate()
-                ) // and shutdown when done
+          // Instantiate ReelerSystem with the config object
+          ReelerSystem(
+            inputReelElementStream = () => inputStream,
+            config                 = reelerConfig,
+            userRoutes             = Nil
+          )
+        }
 
-            }
+        val bindingFuture = reelerSystem.start()
+
+        bindingFuture
+          .map { binding =>
+            logger.info(
+              s"Server online at http://localhost:8080/\nPress RETURN to stop..."
+            )
+            StdIn.readLine()
+
+            logger.info("Stopping...")
+
+            binding
+              .unbind() // trigger unbinding from the port
+              .onComplete(_ =>
+                actorSystem.terminate()
+              ) // and shutdown when done
+
+          }
+  }
 
 }

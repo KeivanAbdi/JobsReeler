@@ -52,7 +52,7 @@ object LinkedInJobFlows {
       }
 
   def filterJobType(
-      allowedJobTypes: JobType*
+      allowedJobTypes: Set[JobType]
   )(using Ordering[Log]): Flow[
     ReelElement[JobSummary, JobMetaData, Instructions],
     ReelElement[JobSummary, JobMetaData, Instructions],
