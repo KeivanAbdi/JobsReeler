@@ -1,6 +1,6 @@
 package com.keivanabdi.jobsreeler.streams
 
-object GermanyScalaJobsStreamProfile extends DACHScalaJobsStreamProfile {
+object GermanyJobsStreamProfile extends DACHJobsStreamProfile {
   val geoId      : String = "101282230"
   val countryName: String = "germany"
 }

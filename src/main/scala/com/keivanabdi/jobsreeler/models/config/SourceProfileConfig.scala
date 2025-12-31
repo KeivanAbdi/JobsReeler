@@ -8,14 +8,17 @@ import com.keivanabdi.jobsreeler.models.job.JobType
 
 sealed trait SourceProfileConfig(
     val profile: StreamProfile
-) derives ConfigReader
+) derives ConfigReader {
+  val searchKeywords: Set[String]
+  val jobTypes      : Set[JobType]
 
-sealed trait DACHScalaJobsConfig extends SourceProfileConfig {
+}
+
+sealed trait DACHJobsConfig extends SourceProfileConfig {
 
   val whitelistWords     : Set[String]
   val blacklistWords     : Set[String]
   val germanLanguageLevel: GermanLanguageLevel
-  val jobTypes           : Set[JobType]
   override def toString(): String =
     s"""
      whitelistWords: ${whitelistWords.mkString(", ")}
@@ -23,18 +26,20 @@ sealed trait DACHScalaJobsConfig extends SourceProfileConfig {
      """.stripIndent()
 }
 
-case class GermanyScalaJobs(
+case class GermanyJobs(
     override val whitelistWords     : Set[String],
     override val blacklistWords     : Set[String],
     override val germanLanguageLevel: GermanLanguageLevel,
-    override val jobTypes           : Set[JobType]
-) extends SourceProfileConfig(GermanyScalaJobsStreamProfile)
-    with DACHScalaJobsConfig
+    override val jobTypes           : Set[JobType],
+    override val searchKeywords     : Set[String]
+) extends SourceProfileConfig(GermanyJobsStreamProfile)
+    with DACHJobsConfig
 
-case class AustriaScalaJobs(
+case class AustriaJobs(
     override val whitelistWords     : Set[String],
     override val blacklistWords     : Set[String],
     override val germanLanguageLevel: GermanLanguageLevel,
-    override val jobTypes           : Set[JobType]
-) extends SourceProfileConfig(AustriaScalaJobsStreamProfile)
-    with DACHScalaJobsConfig
+    override val jobTypes           : Set[JobType],
+    override val searchKeywords     : Set[String]
+) extends SourceProfileConfig(AustriaJobsStreamProfile)
+    with DACHJobsConfig

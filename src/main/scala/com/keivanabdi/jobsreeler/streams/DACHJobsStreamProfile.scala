@@ -20,7 +20,7 @@ import com.keivanabdi.datareeler.templates.FullWidthInfiniteScroll
 import com.keivanabdi.datareeler.templates.FullWidthInfiniteScroll.Instructions
 import com.keivanabdi.jobsreeler.models.config.AIConfig
 import com.keivanabdi.jobsreeler.models.config.AppConfig
-import com.keivanabdi.jobsreeler.models.config.DACHScalaJobsConfig
+import com.keivanabdi.jobsreeler.models.config.DACHJobsConfig
 import com.keivanabdi.jobsreeler.models.job.JobDetail
 import com.keivanabdi.jobsreeler.models.job.JobMetaData
 import com.keivanabdi.jobsreeler.models.job.JobSummary
@@ -31,14 +31,14 @@ import com.keivanabdi.jobsreeler.utils.VisaSponsorshipHelper.*
 import org.joda.time.DateTime
 import org.slf4j.LoggerFactory
 
-trait DACHScalaJobsStreamProfile extends StreamProfile {
+trait DACHJobsStreamProfile extends StreamProfile {
   private val logger = LoggerFactory.getLogger(getClass.getName)
 
   val geoId      : String
   val countryName: String
 
-  lazy val initialUrl: String =
-    s"https://www.linkedin.com/jobs/search/?keywords=scala&geoId=$geoId&sortBy=DD&f_WT=1%2C3&origin=JOB_SEARCH_PAGE_SEARCH_BUTTON"
+  def initialUrl(using appConfig: AppConfig): String =
+    s"https://www.linkedin.com/jobs/search/?keywords=${appConfig.sourceProfile.searchKeywords.mkString("+")}&geoId=$geoId&sortBy=DD&f_WT=${appConfig.sourceProfile.jobTypes.map(_.code).mkString(",")}&origin=JOB_SEARCH_PAGE_SEARCH_BUTTON"
 
   def buildJobStream(
       linkedInScrapper: LinkedInJobsScrapper
@@ -123,13 +123,13 @@ trait DACHScalaJobsStreamProfile extends StreamProfile {
         case Right(visaSponsoringCompanyUsernames) =>
           given AIConfig = appConfig.ai
 
-          val dachSourceProfileConfig: DACHScalaJobsConfig =
+          val dachSourceProfileConfig: DACHJobsConfig =
             (appConfig.sourceProfile: @unchecked) match {
-              case dachScalaJobsConfig: DACHScalaJobsConfig =>
-                dachScalaJobsConfig
+              case dachJobsConfig: DACHJobsConfig =>
+                dachJobsConfig
               case other =>
                 val errorMsg =
-                  s"Incompatible source profile configuration: ${other.getClass.getName} for DACHScalaJobsStreamProfile. Expected a DACHScalaJobsConfig."
+                  s"Incompatible source profile configuration: ${other.getClass.getName} for DACHJobsStreamProfile. Expected a DACHJobsConfig."
                 logger.error(errorMsg)
                 throw new IllegalArgumentException(errorMsg)
             }

@@ -308,7 +308,7 @@ class LinkedInJobsScrapper(
               )
           }
 
-        log(Level.INFO, s"Navigated to '$initialUrl'}", logActor)
+        log(Level.INFO, s"Navigated to '$initialUrl'", logActor)
 
         // 2) Check HTTP status
         if (response.status() != 200) {
